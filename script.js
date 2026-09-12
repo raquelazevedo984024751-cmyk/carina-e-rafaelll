@@ -1,7 +1,3 @@
-```javascript
-// ========================================
-// CONFIGURAÇÕES
-// ========================================
 
 const CLOUD_NAME = "ne8kkec1";
 const UPLOAD_PRESET = "ml default";
@@ -15,57 +11,29 @@ const GOOGLE_SCRIPT_URL =
     "https://script.google.com/macros/s/AKfycbxT5yzJiMTZjCS-hyKn0V3I6vK26Vc6oV3H0703Dc9K9TuFe1R0y_N7xFxPLtFMcjrd/exec";
 
 
-// ========================================
-// ELEMENTOS
-// ========================================
-
 const photoInput = document.getElementById("photoInput");
 const preview = document.getElementById("preview");
 const sendButton = document.getElementById("sendButton");
 const status = document.getElementById("status");
 const gallery = document.getElementById("gallery");
 
-
-// ========================================
-// FOTOS SELECIONADAS
-// ========================================
-
 let selectedFiles = [];
 
 
-// ========================================
-// INICIAR
-// ========================================
-
-window.addEventListener("load", function () {
-
-    carregarGaleria();
-
-});
-
-
-// ========================================
-// SELECIONAR FOTOS
-// ========================================
-
 photoInput.addEventListener("change", function () {
 
-    const novasFotos = Array.from(photoInput.files);
+    const files = Array.from(photoInput.files);
 
-    if (novasFotos.length === 0) {
+    if (files.length === 0) {
         return;
     }
 
-    selectedFiles = selectedFiles.concat(novasFotos);
+    selectedFiles = selectedFiles.concat(files);
 
     mostrarPreview();
 
 });
 
-
-// ========================================
-// MOSTRAR PREVIEW
-// ========================================
 
 function mostrarPreview() {
 
@@ -74,36 +42,34 @@ function mostrarPreview() {
     selectedFiles.forEach(function (file, index) {
 
         const item = document.createElement("div");
-
         item.className = "preview-item";
 
-
         const imagem = document.createElement("img");
-
-        imagem.src = URL.createObjectURL(file);
-
         imagem.alt = "Foto selecionada";
 
+        const reader = new FileReader();
 
-        const botao = document.createElement("button");
+        reader.onload = function (event) {
+            imagem.src = event.target.result;
+        };
 
-        botao.type = "button";
-
-        botao.className = "remove-photo";
-
-        botao.textContent = "×";
+        reader.readAsDataURL(file);
 
 
-        botao.addEventListener("click", function () {
+        const remover = document.createElement("button");
 
-            removerFoto(index);
+        remover.type = "button";
+        remover.className = "remove-photo";
+        remover.textContent = "×";
 
-        });
+        remover.onclick = function () {
+            selectedFiles.splice(index, 1);
+            mostrarPreview();
+        };
 
 
         item.appendChild(imagem);
-
-        item.appendChild(botao);
+        item.appendChild(remover);
 
         preview.appendChild(item);
 
@@ -116,69 +82,33 @@ function mostrarPreview() {
 }
 
 
-// ========================================
-// REMOVER FOTO
-// ========================================
-
-function removerFoto(index) {
-
-    selectedFiles.splice(index, 1);
-
-    mostrarPreview();
-
-}
-
-
-// ========================================
-// ENVIAR PARA CLOUDINARY
-// ========================================
-
 async function enviarParaCloudinary(file) {
 
-    const dados = new FormData();
+    const formData = new FormData();
 
-    dados.append("file", file);
-
-    dados.append(
-        "upload_preset",
-        UPLOAD_PRESET
-    );
+    formData.append("file", file);
+    formData.append("upload_preset", UPLOAD_PRESET);
 
 
     const resposta = await fetch(
         CLOUDINARY_URL,
         {
             method: "POST",
-            body: dados
+            body: formData
         }
     );
 
 
-    let resultado;
-
-    try {
-
-        resultado = await resposta.json();
-
-    } catch (erro) {
-
-        throw new Error(
-            "O Cloudinary não retornou uma resposta válida."
-        );
-
-    }
+    const resultado = await resposta.json();
 
 
     if (!resposta.ok) {
 
-        console.error(
-            "Erro Cloudinary:",
-            resultado
-        );
-
         throw new Error(
-            resultado.error?.message ||
-            "O Cloudinary recusou a foto."
+            resultado.error &&
+            resultado.error.message
+                ? resultado.error.message
+                : "Erro no Cloudinary."
         );
 
     }
@@ -186,13 +116,8 @@ async function enviarParaCloudinary(file) {
 
     if (!resultado.secure_url) {
 
-        console.error(
-            "Resposta Cloudinary:",
-            resultado
-        );
-
         throw new Error(
-            "O Cloudinary não retornou o endereço da foto."
+            "URL da foto não recebida."
         );
 
     }
@@ -203,18 +128,11 @@ async function enviarParaCloudinary(file) {
 }
 
 
-// ========================================
-// SALVAR NO GOOGLE SHEETS
-// ========================================
-
 async function salvarFotoNaPlanilha(url) {
 
     const dados = JSON.stringify({
-
         url: url,
-
         nome: "Convidado"
-
     });
 
 
@@ -224,14 +142,11 @@ async function salvarFotoNaPlanilha(url) {
             GOOGLE_SCRIPT_URL,
             {
                 method: "POST",
-
                 mode: "no-cors",
-
                 headers: {
                     "Content-Type":
                         "text/plain;charset=utf-8"
                 },
-
                 body: dados
             }
         );
@@ -239,32 +154,22 @@ async function salvarFotoNaPlanilha(url) {
     } catch (erro) {
 
         console.error(
-            "Erro ao salvar no Google Sheets:",
+            "Erro ao salvar na planilha:",
             erro
         );
-
-        // Não impede a foto de aparecer no álbum.
-        // O Cloudinary já recebeu a imagem.
 
     }
 
 }
 
 
-// ========================================
-// ADICIONAR NA GALERIA
-// ========================================
-
 function adicionarNaGaleria(url) {
 
-    const aviso =
+    const vazio =
         gallery.querySelector(".empty-gallery");
 
-
-    if (aviso) {
-
-        aviso.remove();
-
+    if (vazio) {
+        vazio.remove();
     }
 
 
@@ -279,36 +184,22 @@ function adicionarNaGaleria(url) {
         document.createElement("img");
 
     imagem.src = url;
-
-    imagem.alt =
-        "Foto compartilhada do casamento";
-
-    imagem.loading =
-        "lazy";
+    imagem.alt = "Foto compartilhada";
+    imagem.loading = "lazy";
 
 
     const baixar =
         document.createElement("a");
 
     baixar.href = url;
-
     baixar.target = "_blank";
-
-    baixar.rel =
-        "noopener noreferrer";
-
-    baixar.className =
-        "download-button";
-
-    baixar.title =
-        "Abrir foto";
-
-    baixar.textContent =
-        "↓";
+    baixar.rel = "noopener noreferrer";
+    baixar.className = "download-button";
+    baixar.title = "Abrir foto";
+    baixar.textContent = "↓";
 
 
     foto.appendChild(imagem);
-
     foto.appendChild(baixar);
 
     gallery.appendChild(foto);
@@ -316,28 +207,19 @@ function adicionarNaGaleria(url) {
 }
 
 
-// ========================================
-// CARREGAR GALERIA
-// ========================================
-
 async function carregarGaleria() {
 
     try {
 
-        const resposta =
-            await fetch(
-                GOOGLE_SCRIPT_URL +
-                "?t=" +
-                Date.now()
-            );
+        const resposta = await fetch(
+            GOOGLE_SCRIPT_URL +
+            "?t=" +
+            Date.now()
+        );
 
 
         if (!resposta.ok) {
-
-            throw new Error(
-                "Não foi possível carregar a galeria."
-            );
-
+            return;
         }
 
 
@@ -346,14 +228,7 @@ async function carregarGaleria() {
 
 
         if (!Array.isArray(fotos)) {
-
-            console.error(
-                "Resposta inválida:",
-                fotos
-            );
-
             return;
-
         }
 
 
@@ -361,8 +236,8 @@ async function carregarGaleria() {
 
             if (
                 foto &&
-                foto.url &&
-                typeof foto.url === "string"
+                typeof foto.url === "string" &&
+                foto.url.trim() !== ""
             ) {
 
                 adicionarNaGaleria(
@@ -377,7 +252,7 @@ async function carregarGaleria() {
     } catch (erro) {
 
         console.error(
-            "Erro ao carregar galeria:",
+            "Erro ao carregar fotos:",
             erro
         );
 
@@ -385,10 +260,6 @@ async function carregarGaleria() {
 
 }
 
-
-// ========================================
-// ENVIAR FOTOS
-// ========================================
 
 sendButton.addEventListener(
     "click",
@@ -401,167 +272,110 @@ sendButton.addEventListener(
         }
 
 
-        const fotos =
-            selectedFiles.slice();
-
-
         sendButton.disabled = true;
-
         photoInput.disabled = true;
+
+
+        const arquivos =
+            selectedFiles.slice();
 
 
         let enviadas = 0;
 
-        let erros = 0;
 
+        for (
+            let i = 0;
+            i < arquivos.length;
+            i++
+        ) {
 
-        try {
-
-            for (
-                let i = 0;
-                i < fotos.length;
-                i++
-            ) {
-
-                const file =
-                    fotos[i];
-
-
-                status.textContent =
-                    "Enviando foto " +
-                    (i + 1) +
-                    " de " +
-                    fotos.length +
-                    "...";
-
-
-                try {
-
-                    // -------------------------
-                    // CLOUDINARY
-                    // -------------------------
-
-                    const url =
-                        await enviarParaCloudinary(
-                            file
-                        );
-
-
-                    // -------------------------
-                    // GOOGLE SHEETS
-                    // -------------------------
-
-                    await salvarFotoNaPlanilha(
-                        url
-                    );
-
-
-                    // -------------------------
-                    // GALERIA
-                    // -------------------------
-
-                    adicionarNaGaleria(
-                        url
-                    );
-
-
-                    enviadas++;
-
-
-                } catch (erroFoto) {
-
-                    erros++;
-
-
-                    console.error(
-                        "Erro na foto " +
-                        (i + 1) +
-                        ":",
-                        erroFoto
-                    );
-
-                }
-
-            }
-
-
-            // ========================================
-            // RESULTADO
-            // ========================================
-
-            if (
-                enviadas > 0 &&
-                erros === 0
-            ) {
-
-                status.textContent =
-                    enviadas === 1
-                        ? "Foto enviada com sucesso! 💜"
-                        : enviadas +
-                          " fotos enviadas com sucesso! 💜";
-
-            } else if (
-                enviadas > 0 &&
-                erros > 0
-            ) {
-
-                status.textContent =
-                    enviadas +
-                    " foto(s) enviada(s). " +
-                    erros +
-                    " não puderam ser enviadas.";
-
-            } else {
-
-                status.textContent =
-                    "Não foi possível enviar as fotos. Verifique o Cloudinary.";
-
-            }
-
-
-            // Limpar seleção
-
-            selectedFiles = [];
-
-            photoInput.value = "";
-
-            preview.innerHTML = "";
-
-
-        } catch (erro) {
-
-            console.error(
-                "Erro geral:",
-                erro
-            );
+            const arquivo =
+                arquivos[i];
 
 
             status.textContent =
-                "Ocorreu um erro. Tente novamente.";
+                "Enviando foto " +
+                (i + 1) +
+                " de " +
+                arquivos.length +
+                "...";
+
+
+            try {
+
+                const url =
+                    await enviarParaCloudinary(
+                        arquivo
+                    );
+
+
+                await salvarFotoNaPlanilha(
+                    url
+                );
+
+
+                adicionarNaGaleria(
+                    url
+                );
+
+
+                enviadas++;
+
+
+            } catch (erro) {
+
+                console.error(
+                    "Erro ao enviar:",
+                    erro
+                );
+
+            }
 
         }
 
 
-        photoInput.disabled = false;
+        if (enviadas === arquivos.length) {
 
-        sendButton.disabled =
-            selectedFiles.length === 0;
+            status.textContent =
+                enviadas === 1
+                    ? "Foto enviada com sucesso! 💜"
+                    : enviadas +
+                      " fotos enviadas com sucesso! 💜";
+
+        } else if (enviadas > 0) {
+
+            status.textContent =
+                enviadas +
+                " foto(s) enviada(s) com sucesso!";
+
+        } else {
+
+            status.textContent =
+                "Não foi possível enviar as fotos.";
+
+        }
+
+
+        selectedFiles = [];
+
+        photoInput.value = "";
+
+        preview.innerHTML = "";
+
+
+        photoInput.disabled = false;
+        sendButton.disabled = true;
 
     }
 );
 
 
-// ========================================
-// NAVEGAÇÃO SUAVE
-// ========================================
-
-const links =
-    document.querySelectorAll(
-        'a[href^="#"]'
-    );
+carregarGaleria();
 
 
-links.forEach(function (link) {
+document.querySelectorAll(
+    'a[href^="#"]'
+).forEach(function (link) {
 
     link.addEventListener(
         "click",
@@ -570,7 +384,6 @@ links.forEach(function (link) {
             const id =
                 link.getAttribute("href");
 
-
             const destino =
                 document.querySelector(id);
 
@@ -578,7 +391,6 @@ links.forEach(function (link) {
             if (destino) {
 
                 event.preventDefault();
-
 
                 destino.scrollIntoView({
                     behavior: "smooth"
@@ -590,4 +402,4 @@ links.forEach(function (link) {
     );
 
 });
-```
+
