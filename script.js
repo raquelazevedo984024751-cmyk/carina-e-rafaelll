@@ -1,4 +1,4 @@
-
+```javascript
 // ========================================
 // CONFIGURAÇÕES
 // ========================================
@@ -16,7 +16,7 @@ const GOOGLE_SCRIPT_URL =
 
 
 // ========================================
-// ELEMENTOS DO SITE
+// ELEMENTOS
 // ========================================
 
 const photoInput = document.getElementById("photoInput");
@@ -34,19 +34,27 @@ let selectedFiles = [];
 
 
 // ========================================
-// CARREGAR GALERIA AO ABRIR O SITE
+// INICIAR
 // ========================================
 
-window.addEventListener("load", carregarGaleria);
+window.addEventListener("load", function () {
+
+    carregarGaleria();
+
+});
 
 
 // ========================================
-// ESCOLHER FOTOS
+// SELECIONAR FOTOS
 // ========================================
 
 photoInput.addEventListener("change", function () {
 
     const novasFotos = Array.from(photoInput.files);
+
+    if (novasFotos.length === 0) {
+        return;
+    }
 
     selectedFiles = selectedFiles.concat(novasFotos);
 
@@ -65,47 +73,45 @@ function mostrarPreview() {
 
     selectedFiles.forEach(function (file, index) {
 
-        const reader = new FileReader();
+        const item = document.createElement("div");
 
-        reader.onload = function (event) {
+        item.className = "preview-item";
 
-            const item = document.createElement("div");
 
-            item.className = "preview-item";
+        const imagem = document.createElement("img");
 
-            const imagem = document.createElement("img");
+        imagem.src = URL.createObjectURL(file);
 
-            imagem.src = event.target.result;
+        imagem.alt = "Foto selecionada";
 
-            imagem.alt = "Foto selecionada";
 
-            const botao = document.createElement("button");
+        const botao = document.createElement("button");
 
-            botao.type = "button";
+        botao.type = "button";
 
-            botao.className = "remove-photo";
+        botao.className = "remove-photo";
 
-            botao.textContent = "×";
+        botao.textContent = "×";
 
-            botao.addEventListener("click", function () {
 
-                removerFoto(index);
+        botao.addEventListener("click", function () {
 
-            });
+            removerFoto(index);
 
-            item.appendChild(imagem);
+        });
 
-            item.appendChild(botao);
 
-            preview.appendChild(item);
+        item.appendChild(imagem);
 
-        };
+        item.appendChild(botao);
 
-        reader.readAsDataURL(file);
+        preview.appendChild(item);
 
     });
 
-    sendButton.disabled = selectedFiles.length === 0;
+
+    sendButton.disabled =
+        selectedFiles.length === 0;
 
 }
 
@@ -124,7 +130,7 @@ function removerFoto(index) {
 
 
 // ========================================
-// ENVIAR FOTO PARA O CLOUDINARY
+// ENVIAR PARA CLOUDINARY
 // ========================================
 
 async function enviarParaCloudinary(file) {
@@ -133,7 +139,11 @@ async function enviarParaCloudinary(file) {
 
     dados.append("file", file);
 
-    dados.append("upload_preset", UPLOAD_PRESET);
+    dados.append(
+        "upload_preset",
+        UPLOAD_PRESET
+    );
+
 
     const resposta = await fetch(
         CLOUDINARY_URL,
@@ -143,17 +153,43 @@ async function enviarParaCloudinary(file) {
         }
     );
 
-    if (!resposta.ok) {
+
+    let resultado;
+
+    try {
+
+        resultado = await resposta.json();
+
+    } catch (erro) {
 
         throw new Error(
-            "Erro ao enviar foto para o Cloudinary."
+            "O Cloudinary não retornou uma resposta válida."
         );
 
     }
 
-    const resultado = await resposta.json();
+
+    if (!resposta.ok) {
+
+        console.error(
+            "Erro Cloudinary:",
+            resultado
+        );
+
+        throw new Error(
+            resultado.error?.message ||
+            "O Cloudinary recusou a foto."
+        );
+
+    }
+
 
     if (!resultado.secure_url) {
+
+        console.error(
+            "Resposta Cloudinary:",
+            resultado
+        );
 
         throw new Error(
             "O Cloudinary não retornou o endereço da foto."
@@ -161,45 +197,69 @@ async function enviarParaCloudinary(file) {
 
     }
 
+
     return resultado.secure_url;
 
 }
 
 
 // ========================================
-// SALVAR FOTO NO GOOGLE SHEETS
+// SALVAR NO GOOGLE SHEETS
 // ========================================
 
 async function salvarFotoNaPlanilha(url) {
 
     const dados = JSON.stringify({
+
         url: url,
+
         nome: "Convidado"
+
     });
 
-    await fetch(
-        GOOGLE_SCRIPT_URL,
-        {
-            method: "POST",
-            mode: "no-cors",
-            headers: {
-                "Content-Type": "text/plain;charset=utf-8"
-            },
-            body: dados
-        }
-    );
+
+    try {
+
+        await fetch(
+            GOOGLE_SCRIPT_URL,
+            {
+                method: "POST",
+
+                mode: "no-cors",
+
+                headers: {
+                    "Content-Type":
+                        "text/plain;charset=utf-8"
+                },
+
+                body: dados
+            }
+        );
+
+    } catch (erro) {
+
+        console.error(
+            "Erro ao salvar no Google Sheets:",
+            erro
+        );
+
+        // Não impede a foto de aparecer no álbum.
+        // O Cloudinary já recebeu a imagem.
+
+    }
 
 }
 
 
 // ========================================
-// CRIAR FOTO NA GALERIA
+// ADICIONAR NA GALERIA
 // ========================================
 
 function adicionarNaGaleria(url) {
 
     const aviso =
         gallery.querySelector(".empty-gallery");
+
 
     if (aviso) {
 
@@ -211,7 +271,8 @@ function adicionarNaGaleria(url) {
     const foto =
         document.createElement("div");
 
-    foto.className = "gallery-photo";
+    foto.className =
+        "gallery-photo";
 
 
     const imagem =
@@ -222,7 +283,8 @@ function adicionarNaGaleria(url) {
     imagem.alt =
         "Foto compartilhada do casamento";
 
-    imagem.loading = "lazy";
+    imagem.loading =
+        "lazy";
 
 
     const baixar =
@@ -232,15 +294,17 @@ function adicionarNaGaleria(url) {
 
     baixar.target = "_blank";
 
-    baixar.rel = "noopener noreferrer";
+    baixar.rel =
+        "noopener noreferrer";
 
     baixar.className =
         "download-button";
 
     baixar.title =
-        "Baixar foto";
+        "Abrir foto";
 
-    baixar.textContent = "↓";
+    baixar.textContent =
+        "↓";
 
 
     foto.appendChild(imagem);
@@ -253,7 +317,7 @@ function adicionarNaGaleria(url) {
 
 
 // ========================================
-// CARREGAR FOTOS DA PLANILHA
+// CARREGAR GALERIA
 // ========================================
 
 async function carregarGaleria() {
@@ -271,7 +335,7 @@ async function carregarGaleria() {
         if (!resposta.ok) {
 
             throw new Error(
-                "Erro ao consultar a galeria."
+                "Não foi possível carregar a galeria."
             );
 
         }
@@ -283,6 +347,11 @@ async function carregarGaleria() {
 
         if (!Array.isArray(fotos)) {
 
+            console.error(
+                "Resposta inválida:",
+                fotos
+            );
+
             return;
 
         }
@@ -293,7 +362,7 @@ async function carregarGaleria() {
             if (
                 foto &&
                 foto.url &&
-                foto.url.trim() !== ""
+                typeof foto.url === "string"
             ) {
 
                 adicionarNaGaleria(
@@ -318,7 +387,7 @@ async function carregarGaleria() {
 
 
 // ========================================
-// ENVIAR TODAS AS FOTOS
+// ENVIAR FOTOS
 // ========================================
 
 sendButton.addEventListener(
@@ -332,79 +401,125 @@ sendButton.addEventListener(
         }
 
 
+        const fotos =
+            selectedFiles.slice();
+
+
         sendButton.disabled = true;
 
         photoInput.disabled = true;
 
 
-        const fotosParaEnviar =
-            selectedFiles.slice();
+        let enviadas = 0;
 
-
-        let quantidadeEnviada = 0;
+        let erros = 0;
 
 
         try {
 
             for (
                 let i = 0;
-                i < fotosParaEnviar.length;
+                i < fotos.length;
                 i++
             ) {
 
                 const file =
-                    fotosParaEnviar[i];
+                    fotos[i];
 
 
                 status.textContent =
                     "Enviando foto " +
                     (i + 1) +
                     " de " +
-                    fotosParaEnviar.length +
+                    fotos.length +
                     "...";
 
 
-                // -------------------------
-                // 1. CLOUDINARY
-                // -------------------------
+                try {
 
-                const url =
-                    await enviarParaCloudinary(
-                        file
+                    // -------------------------
+                    // CLOUDINARY
+                    // -------------------------
+
+                    const url =
+                        await enviarParaCloudinary(
+                            file
+                        );
+
+
+                    // -------------------------
+                    // GOOGLE SHEETS
+                    // -------------------------
+
+                    await salvarFotoNaPlanilha(
+                        url
                     );
 
 
-                // -------------------------
-                // 2. GOOGLE SHEETS
-                // -------------------------
+                    // -------------------------
+                    // GALERIA
+                    // -------------------------
 
-                await salvarFotoNaPlanilha(
-                    url
-                );
-
-
-                // -------------------------
-                // 3. GALERIA
-                // -------------------------
-
-                adicionarNaGaleria(
-                    url
-                );
+                    adicionarNaGaleria(
+                        url
+                    );
 
 
-                quantidadeEnviada++;
+                    enviadas++;
+
+
+                } catch (erroFoto) {
+
+                    erros++;
+
+
+                    console.error(
+                        "Erro na foto " +
+                        (i + 1) +
+                        ":",
+                        erroFoto
+                    );
+
+                }
 
             }
 
 
-            status.textContent =
-                quantidadeEnviada +
-                (
-                    quantidadeEnviada === 1
-                        ? " foto enviada com sucesso! 💜"
-                        : " fotos enviadas com sucesso! 💜"
-                );
+            // ========================================
+            // RESULTADO
+            // ========================================
 
+            if (
+                enviadas > 0 &&
+                erros === 0
+            ) {
+
+                status.textContent =
+                    enviadas === 1
+                        ? "Foto enviada com sucesso! 💜"
+                        : enviadas +
+                          " fotos enviadas com sucesso! 💜";
+
+            } else if (
+                enviadas > 0 &&
+                erros > 0
+            ) {
+
+                status.textContent =
+                    enviadas +
+                    " foto(s) enviada(s). " +
+                    erros +
+                    " não puderam ser enviadas.";
+
+            } else {
+
+                status.textContent =
+                    "Não foi possível enviar as fotos. Verifique o Cloudinary.";
+
+            }
+
+
+            // Limpar seleção
 
             selectedFiles = [];
 
@@ -416,14 +531,13 @@ sendButton.addEventListener(
         } catch (erro) {
 
             console.error(
-                "Erro no envio:",
+                "Erro geral:",
                 erro
             );
 
 
             status.textContent =
-                "Ocorreu um erro ao enviar a foto. Tente novamente.";
-
+                "Ocorreu um erro. Tente novamente.";
 
         }
 
@@ -465,6 +579,7 @@ links.forEach(function (link) {
 
                 event.preventDefault();
 
+
                 destino.scrollIntoView({
                     behavior: "smooth"
                 });
@@ -475,3 +590,4 @@ links.forEach(function (link) {
     );
 
 });
+```
